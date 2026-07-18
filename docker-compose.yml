@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: clinical_trials
+      POSTGRES_USER: trials_user
+      POSTGRES_PASSWORD: trials_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trials_user -d clinical_trials"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  etl:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://trials_user:trials_pass@db:5432/clinical_trials
+      MAX_STUDIES: "5000"
+      PAGE_SIZE: "100"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python -m etl.run_etl
+
+  # Optional: web UI to browse the database (open http://localhost:8080)
+  adminer:
+    image: adminer:4
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+
+volumes:
+  pgdata:
